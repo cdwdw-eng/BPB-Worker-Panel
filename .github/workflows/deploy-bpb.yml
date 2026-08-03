@@ -7,10 +7,10 @@ permissions:
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 2 * * 0"  # 每周日凌晨2点同步上游（慢一点）
+    - cron: "0 2 * * 0"  # 每周日凌晨2点同步
   push:
     branches:
-      - main  # 手动 push 也触发
+      - main
 
 jobs:
   sync-and-deploy:
@@ -25,36 +25,24 @@ jobs:
 
       - name: Sync from upstream
         run: |
-          # 添加上游仓库为 remote
           git remote add upstream https://github.com/bia-pain-bache/BPB-Worker-Panel.git
           git fetch upstream
-          
-          # 获取上游 main 分支最新 commit
           UPSTREAM_COMMIT=$(git rev-parse upstream/main)
-          echo "Upstream latest: $UPSTREAM_COMMIT"
-          
-          # 检查本地 main 是否落后
           LOCAL_COMMIT=$(git rev-parse origin/main)
-          echo "Local main: $LOCAL_COMMIT"
-          
+          echo "Upstream: $UPSTREAM_COMMIT"
+          echo "Local: $LOCAL_COMMIT"
           if [ "$UPSTREAM_COMMIT" != "$LOCAL_COMMIT" ]; then
-            echo "Need to merge upstream changes..."
             git merge upstream/main -m "Merge upstream BPB-Worker-Panel"
             echo "MERGED=true" >> $GITHUB_ENV
           else
-            echo "Already in sync"
             echo "MERGED=false" >> $GITHUB_ENV
           fi
 
-      - name: Obfuscate code (BPB-Wizard style)
+      - name: Obfuscate code
         if: env.MERGED == 'true'
         run: |
-          # 简单的变量名混淆（每次部署自动换）
           RANDOM_ID=$(date +%s | sha256sum | head -c 8)
           echo "Obfuscation ID: $RANDOM_ID"
-          
-          # 混淆 src/worker/*.ts 中的敏感变量名
-          # 具体混淆规则根据 BPB 源码结构调整
           echo "Obfuscation complete"
 
       - name: Build BPB
@@ -62,12 +50,9 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+      - name: Deploy to Cloudflare Pages via wrangler
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: bpb
-          directory: dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          wranglerVersion: "3"
+          command: pages deploy dist --project-name=bpb
