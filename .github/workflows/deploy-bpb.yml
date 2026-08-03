@@ -50,6 +50,13 @@ jobs:
           npm install
           npm run build
 
+      - name: Bind KV via wrangler
+        run: |
+          npx wrangler pages project list --account-id ${{ secrets.CF_ACCOUNT_ID }} 2>&1 || true
+          npx wrangler pages project update bpb \
+            --account-id ${{ secrets.CF_ACCOUNT_ID }} \
+            --kv-namespace ${{ secrets.CF_KV_ID }} 2>&1 || true
+
       - name: Deploy to Cloudflare Pages via wrangler
         uses: cloudflare/wrangler-action@v3
         with:
